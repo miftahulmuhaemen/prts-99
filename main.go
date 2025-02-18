@@ -1,11 +1,13 @@
-// Create basic web server with echo framework 
+// Create basic web server with echo framework
 // and return Hello World! as response
 package main
 
 import (
-	"github.com/labstack/echo/v4"
+	internal "chat-ak-wikia/internal/scrapper"
 	"net/http"
-	"chat-ak-wikia/pkg/internal"
+
+	"github.com/gocolly/colly"
+	"github.com/labstack/echo/v4"
 )
 
 func main() {
@@ -14,13 +16,15 @@ func main() {
 
 	// Define route
 	e.GET("/", func(c echo.Context) error {
-		// call PrintOperator function from internal package
-		operator, err := scrapper.Scrapper()
-        if err != nil {
-            return c.String(http.StatusInternalServerError, "Error scraping data")
-        }
-        scrapper.PrintOperator(operator)
-		return c.String(http.StatusOK, "Hello World!")
+		collector := colly.NewCollector(
+			colly.AllowedDomains("arknights.wiki.gg"),
+			colly.CacheDir("./cache"),
+		)
+		operator, err := internal.Scrapper(1, "https://arknights.wiki.gg/wiki/Operator/6-star", collector)
+		if err != nil {
+			return c.String(http.StatusInternalServerError, "Error scraping data")
+		}
+		return c.JSON(http.StatusOK, operator)
 	})
 
 	// Start server

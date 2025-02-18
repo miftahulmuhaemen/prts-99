@@ -28,11 +28,13 @@
 .vscode/
 .idea/
 *.iml
+*.air.toml
 
 # Logs and debugging
 *.log
 *.out
 *.test
+cache/
 
 # Environment and configuration files
 .env
@@ -49,6 +51,7 @@ cover.out
 *.cover.out
 *.cov
 *.coverage
+coverage*.html
 
 # Docker-related files
 **/docker-compose.override.yml
