@@ -35,6 +35,8 @@
 *.out
 *.test
 cache/
+local_cache/
+model_cache/
 
 # Environment and configuration files
 .env
