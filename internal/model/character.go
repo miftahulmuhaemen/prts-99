@@ -234,11 +234,75 @@ func (o Operator) OperatorToStrings() ([][]string, []map[string]*qdrant.Value) {
 		})
 	}
 
-	// potential := fmt.Sprintf(`Potential: %s`, JSONToString(o.Potentials))
+	potStrs := []string{}
+	for _, potential := range o.Potentials {
+		potStr := fmt.Sprintf(`Level: %s
+			Effect: %s
+		`, potential.Level, potential.Effect)
+		retStr = append(retStr, []string{"Potential", metadata, potStr})
+		retVal = append(retVal, map[string]*qdrant.Value{
+			"level":  qdrant.NewValueString(potential.Level),
+			"effect": qdrant.NewValueString(potential.Effect),
+		})
+		potStrs = append(potStrs, potStr)
+	}
 
-	// promotion := fmt.Sprintf(`Promotion: %s`, JSONToString(o.Promotions))
+	potential := fmt.Sprintf(`Potential: %s`, strings.Join(potStrs, ", "))
+	retStr = append(retStr, []string{"Potential", metadata, potential})
+	retVal = append(retVal, map[string]*qdrant.Value{
+		"potential": qdrant.NewValueString(strings.Join(potStrs, ", ")),
+	})
 
-	// talent := fmt.Sprintf(`Talent: %s`, JSONToString(o.Talents))
+	trustbonus := fmt.Sprintf(`(200%%) Trust Bonus
+		HP: %d
+		ATK: %d
+		DEF:  %d`, o.TrustBonus.HP, o.TrustBonus.Atk, o.TrustBonus.DEF)
+	retStr = append(retStr, []string{"Trust Bonus", metadata, trustbonus})
+	retVal = append(retVal, map[string]*qdrant.Value{
+		"hp":  qdrant.NewValueString(fmt.Sprint(o.TrustBonus.HP)),
+		"atk": qdrant.NewValueString(fmt.Sprint(o.TrustBonus.Atk)),
+		"def": qdrant.NewValueString(fmt.Sprint(o.TrustBonus.DEF)),
+	})
+
+	for _, promotion := range o.Promotions {
+		materialStr := []string{}
+		for _, material := range promotion.RequiredMaterials {
+			materialStr = append(materialStr, fmt.Sprintf(`Name: %s
+				Amount: %s
+			`, material.Name, material.Amount))
+		}
+
+		promotionStr := fmt.Sprintf(`Level: %s
+			Gained Effect: %s
+			Required Materials: %s
+		`, promotion.Level, strings.Join(promotion.GainedEffect, ", "), strings.Join(materialStr, ", "))
+		retStr = append(retStr, []string{"Promotion", metadata, promotionStr})
+		retVal = append(retVal, map[string]*qdrant.Value{
+			"level":              qdrant.NewValueString(promotion.Level),
+			"gained_effect":      qdrant.NewValueString(strings.Join(promotion.GainedEffect, ", ")),
+			"required_materials": qdrant.NewValueString(strings.Join(materialStr, ", ")),
+		})
+	}
+
+	for _, talent := range o.Talents {
+		effectStr := []string{}
+		for _, effect := range talent.Effect {
+			effectStr = append(effectStr, fmt.Sprintf(`Requirement: %s
+				Effect: %s
+			`, effect.Requirement, effect.Effect))
+		}
+
+		talentStr := fmt.Sprintf(`Name: %s
+			Effect: %s
+			Additional Info: %s
+		`, talent.Name, strings.Join(effectStr, ", "), strings.Join(talent.AdditionalInfo, ", "))
+		retStr = append(retStr, []string{"Talent", metadata, talentStr})
+		retVal = append(retVal, map[string]*qdrant.Value{
+			"name":            qdrant.NewValueString(talent.Name),
+			"effect":          qdrant.NewValueString(strings.Join(effectStr, ", ")),
+			"additional_info": qdrant.NewValueString(strings.Join(talent.AdditionalInfo, ", ")),
+		})
+	}
 
 	for iter, skill := range o.Skills {
 		for iterLevel, level := range skill.Levels {
@@ -270,80 +334,3 @@ func (o Operator) OperatorToStrings() ([][]string, []map[string]*qdrant.Value) {
 
 	return retStr, retVal
 }
-
-// func (o Operator) OperatorToStrings() string {
-
-// 	base := fmt.Sprintf(`%s
-// 		%s;
-// 		%s;
-// 		%s;
-// 		%s;
-// 		%s;
-// 		%s;
-// 		%s;
-// 		%s;`, o.OperatorName, o.ShortDescription, strings.Join(o.AscensionWords, "; "), o.Class, o.Branch, o.Faction, o.Position, strings.Join(o.Tags, ", "), o.Trait)
-
-// 	// info := fmt.Sprintf(`%s;`, JSONToString(o.CharacterInfo))
-// 	// attribute := fmt.Sprintf(`%s; %s;`, JSONToString(o.Attributes), JSONToString(o.TrustBonus))
-// 	// potential := fmt.Sprintf(`%s;`, JSONToString(o.Potentials))
-// 	// promotion := fmt.Sprintf(`%s;`, JSONToString(o.Promotions))
-// 	// talent := fmt.Sprintf(`%s;`, JSONToString(o.Talents))
-
-// 	// skills := []string{}
-// 	// for iter, skill := range o.Skills {
-// 	// 	for iterLevel, level := range skill.Levels {
-// 	// 		str := fmt.Sprintf(`%d - Lvl %d: {
-// 	// 			%s
-// 	// 			%s
-// 	// 			%s
-// 	// 			%s
-// 	// 			%s
-// 	// 		}`, iter, iterLevel, skill.Name, skill.RecoveryType, skill.ChargeTime, skill.Description,
-// 	// 			JSONToString(level))
-// 	// 		skills = append(skills, str)
-// 	// 	}
-// 	// }
-
-// 	return base
-// }
-
-// func (o Operator) OperatorToQdrantValue() map[string]*qdrant.Value {
-
-// 	info := fmt.Sprintf(`Detail Information: %s`, JSONToString(o.CharacterInfo))
-// 	attribute := fmt.Sprintf(`Attribute: %s; Status Bonus: %s`, JSONToString(o.Attributes), JSONToString(o.TrustBonus))
-// 	potential := fmt.Sprintf(`Potential: %s: `, JSONToString(o.Potentials))
-// 	promotion := fmt.Sprintf(`Promotion: %s: `, JSONToString(o.Promotions))
-// 	talent := fmt.Sprintf(`Talent: %s: `, JSONToString(o.Talents))
-
-// 	qdrantValue := map[string]any{
-// 		"operator_name":     o.OperatorName,
-// 		"short_description": o.ShortDescription,
-// 		"ascension_words":   strings.Join(o.AscensionWords, "; "),
-// 		"class":             o.Class,
-// 		"branch":            o.Branch,
-// 		"faction":           o.Faction,
-// 		"position":          o.Position,
-// 		"tags":              strings.Join(o.Tags, ", "),
-// 		"trait":             o.Trait,
-// 		"character_info":    info,
-// 		"attributes":        attribute,
-// 		"potentials":        potential,
-// 		"promotions":        promotion,
-// 		"talents":           talent,
-// 	}
-
-// 	for iter, skill := range o.Skills {
-// 		for iterLevel, level := range skill.Levels {
-// 			str := fmt.Sprintf(`
-// 				Name: %s;
-// 				RecoveryType: %s;
-// 				ChargeTime:  %s;
-// 				Description:  %s;
-// 				Additional: %s;`, skill.Name, skill.RecoveryType, skill.ChargeTime, strings.Join(skill.Description, ", "),
-// 				JSONToString(level))
-// 			qdrantValue[fmt.Sprintf("Skill %d - Lvl %d", iter, iterLevel)] = str
-// 		}
-// 	}
-
-// 	return qdrant.NewValueMap(qdrantValue)
-// }

@@ -4,10 +4,12 @@ package main
 
 import (
 	"chat-ak-wikia/internal/db"
-	"chat-ak-wikia/internal/embed_model"
+	em "chat-ak-wikia/internal/embed_model"
 	internal "chat-ak-wikia/internal/scrapper"
-	"log"
+	"os"
+	"os/signal"
 	"strings"
+	"time"
 
 	"context"
 	"fmt"
@@ -17,119 +19,53 @@ import (
 	"github.com/gocolly/colly"
 	"github.com/joho/godotenv"
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/gommon/log"
 	"github.com/qdrant/go-client/qdrant"
 )
 
 func main() {
 
 	// Not override the existing environment variables
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+	_ = godotenv.Load()
+
+	// Create new qdrant instance
+	qClient := db.NewClient(context.Background())
+	defer qClient.Close()
+
+	// Create new Gemini instance
+	gClient := em.NewClient(context.Background())
+	model := gClient.NewEmbeddingModel()
+	defer gClient.Close()
 
 	// Create new echo instance
 	e := echo.New()
-
-	// Create new qdrant instance
-	vectorCollection := "arknights"
-	qdrantClient, err := qdrant.NewClient(&qdrant.Config{
-		Host: "localhost",
-		Port: 6334,
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	// Check if collection already exist or not
-	_, err = qdrantClient.GetCollectionInfo(context.Background(), vectorCollection)
-	if err != nil {
-		onDisk := true
-		err = qdrantClient.CreateCollection(
-			context.Background(),
-			&qdrant.CreateCollection{
-				CollectionName: vectorCollection,
-				VectorsConfig: qdrant.NewVectorsConfig(&qdrant.VectorParams{
-					Size:     768,
-					Distance: qdrant.Distance_Cosine,
-				}),
-				OnDiskPayload: &onDisk,
-			},
-		)
-		if err != nil {
-			panic(err)
-		}
-	}
+	e.Logger.SetLevel(log.INFO)
+	defer e.Close()
 
 	e.GET("/query", func(c echo.Context) error {
-		query := "Which faction Archetto is?"
-		embed := embed_model.GenerateQuery(query)
+		query := c.QueryParam("query")
+		if query == "" {
+			return c.String(http.StatusBadRequest, "Query is required")
+		}
 
-		db.SearchPoints(context.Background(), qdrantClient, vectorCollection, embed)
+		embed := model.Query(context.TODO(), query)
+		res, err := qClient.SearchPoints(context.TODO(), embed)
+		if err != nil {
+			log.Fatalf("Search failed: %v", err)
+		}
 
-		return c.JSON(http.StatusOK, []string{})
+		ret := []string{}
+		for _, r := range res {
+			fmt.Println(r.Id, r.Score)
+			if payload := r.GetPayload(); payload != nil {
+				ret = append(ret, fmt.Sprintf("%v", payload))
+			}
+		}
+
+		return c.JSON(http.StatusOK, ret)
 	})
 
-	// Define route
-	// e.GET("/", func(c echo.Context) error {
-	// 	collector := colly.NewCollector(
-	// 		colly.AllowedDomains("arknights.wiki.gg"),
-	// 		colly.CacheDir("./cache"),
-	// 	)
-
-	// 	operators, err := internal.Scrapper(5, "https://arknights.wiki.gg/wiki/Operator/6-star", collector)
-	// 	if err != nil {
-	// 		return c.String(http.StatusInternalServerError, "Error scraping data")
-	// 	}
-
-	// 	// embeddings := [][][]float32{}
-	// 	// for _, operator := range operators {
-	// 	// 	embedded := embed_model.GeneratePassageEmbeddings(operator.OperatorToStrings())
-	// 	// 	embeddings = append(embeddings, embedded);
-	// 	// }
-
-	// 	points := []*qdrant.PointStruct{}
-	// 	for _, operator := range operators {
-	// 		embedded := embed_model.GeneratePassageEmbeddings(operator.OperatorToStrings())
-
-	// 		fmt.Println("Operator :", operator.OperatorName)
-	// 		for _, embed := range embedded {
-	// 			vector := qdrant.NewVectors(embed...)
-	// 			n, _ := rand.Int(rand.Reader, big.NewInt(1000))
-	// 			id := n.Int64() + 1
-
-	// 			fmt.Println(id)
-
-	// 			points = append(points, &qdrant.PointStruct{
-	// 				Id: qdrant.NewIDNum(uint64(id)),
-	// 				// TODO: Multivector
-	// 				Vectors: vector,
-	// 				Payload: qdrant.NewValueMap(map[string]any{
-	// 					"operator_name": operator.OperatorName,
-	// 				}),
-	// 				// TODO: Payload: qdrant.NewValueMap(model.StructToMap(operator)),
-	// 			})
-	// 		}
-	// 	}
-
-	// 	onWait := true
-	// 	update, err := qdrantClient.Upsert(context.Background(), &qdrant.UpsertPoints{
-	// 		CollectionName: vectorCollection,
-	// 		Points:         points,
-	// 		Wait:           &onWait,
-	// 	})
-
-	// 	print(update)
-
-	// 	if err != nil {
-	// 		fmt.Println(err)
-	// 	}
-
-	// 	return c.JSON(http.StatusOK, operators)
-	// })
-
-	e.GET("/scrape-gemini", func(c echo.Context) error {
+	e.GET("/scrape", func(c echo.Context) error {
 		collector := colly.NewCollector(
 			colly.AllowedDomains("arknights.wiki.gg"),
 			colly.CacheDir("./cache"),
@@ -146,7 +82,7 @@ func main() {
 			strs, ngl := operator.OperatorToStrings()
 			print("Length: ", len(strs), "-", len(ngl), "\n")
 			for strI, str := range strs {
-				embedded := embed_model.GenerateEmbedding(strings.Join(str[1:], " "))
+				embedded := model.Embedding(context.TODO(), strings.Join(str[1:], " "))
 				vector := qdrant.NewVectors(embedded...)
 
 				h.Write(fmt.Appendf(nil, "%s%s", operator.OperatorName, str[0]))
@@ -162,13 +98,7 @@ func main() {
 			}
 		}
 
-		onWait := true
-		_, err = qdrantClient.Upsert(context.Background(), &qdrant.UpsertPoints{
-			CollectionName: vectorCollection,
-			Points:         points,
-			Wait:           &onWait,
-		})
-
+		_, err = qClient.Update(points)
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -176,6 +106,20 @@ func main() {
 		return c.JSON(http.StatusOK, operators)
 	})
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
 	// Start server
-	e.Start(":8080")
+	go func() {
+		if err := e.Start(":8080"); err != nil && err != http.ErrServerClosed {
+			e.Logger.Fatal("shutting down the server")
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shut down the server with a timeout of 10 seconds.
+	<-ctx.Done()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := e.Shutdown(ctx); err != nil {
+		e.Logger.Fatal(err)
+	}
 }

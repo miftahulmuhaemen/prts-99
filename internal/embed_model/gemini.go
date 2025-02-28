@@ -1,4 +1,4 @@
-package embed_model
+package em
 
 import (
 	"context"
@@ -9,34 +9,46 @@ import (
 	"google.golang.org/api/option"
 )
 
-func GenerateEmbedding(text string) []float32 {
-	ctx := context.Background()
+type GeminiClient struct {
+	*genai.Client
+}
+
+type EmbeddingModel struct {
+	EmbedModel *genai.EmbeddingModel
+	QueryModel *genai.EmbeddingModel
+}
+
+func NewClient(ctx context.Context) *GeminiClient {
 	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Close()
+	return &GeminiClient{
+		Client: client,
+	}
+}
 
-	em := client.EmbeddingModel("text-embedding-004")
-	em.TaskType = genai.TaskTypeRetrievalDocument
-	res, err := em.EmbedContent(ctx, genai.Text(text))
+func (c *GeminiClient) NewEmbeddingModel() *EmbeddingModel {
+	emRet := c.EmbeddingModel(os.Getenv("GEMINI_MODEL"))
+	emRet.TaskType = genai.TaskTypeRetrievalDocument
+	emQry := c.EmbeddingModel(os.Getenv("GEMINI_MODEL"))
+	emQry.TaskType = genai.TaskTypeRetrievalQuery
+	return &EmbeddingModel{
+		EmbedModel: emRet,
+		QueryModel: emQry,
+	}
+}
+
+func (c *EmbeddingModel) Embedding(ctx context.Context, text string) []float32 {
+	res, err := c.EmbedModel.EmbedContent(ctx, genai.Text(text))
 	if err != nil {
 		log.Fatal(err)
 	}
 	return res.Embedding.Values
 }
 
-func GenerateQuery(text string) []float32 {
-	ctx := context.Background()
-	client, err := genai.NewClient(ctx, option.WithAPIKey(os.Getenv("GEMINI_API_KEY")))
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer client.Close()
-
-	em := client.EmbeddingModel("text-embedding-004")
-	em.TaskType = genai.TaskTypeRetrievalQuery
-	res, err := em.EmbedContent(ctx, genai.Text(text))
+func (c *EmbeddingModel) Query(ctx context.Context, text string) []float32 {
+	res, err := c.QueryModel.EmbedContent(ctx, genai.Text(text))
 	if err != nil {
 		log.Fatal(err)
 	}

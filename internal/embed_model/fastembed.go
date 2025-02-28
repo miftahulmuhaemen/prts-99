@@ -1,4 +1,4 @@
-package embed_model
+package em
 
 import (
 	"github.com/anush008/fastembed-go"
