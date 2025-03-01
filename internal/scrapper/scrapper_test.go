@@ -5,21 +5,15 @@ import (
 	"chat-ak-wikia/internal/model"
 	"testing"
 
-	"github.com/gocolly/colly"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestScrapper(t *testing.T) {
 
 	url := "https://arknights.wiki.gg/wiki/Operator/6-star"
-	domain := "arknights.wiki.gg"
-	collector := colly.NewCollector(
-		colly.AllowedDomains(domain),
-		colly.CacheDir("./cache"),
-	)
 
 	// Call the Scrapper function
-	operators, err := Scrapper(1, url, collector)
+	operators, err := Scrapper(1, url)
 
 	// Assertions
 	assert.NoError(t, err)

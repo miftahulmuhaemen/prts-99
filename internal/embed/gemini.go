@@ -1,4 +1,4 @@
-package em
+package embed
 
 import (
 	"context"
@@ -39,7 +39,7 @@ func (c *GeminiClient) NewEmbeddingModel() *EmbeddingModel {
 	}
 }
 
-func (c *EmbeddingModel) Embedding(ctx context.Context, text string) []float32 {
+func (c *EmbeddingModel) Embed(ctx context.Context, text string) []float32 {
 	res, err := c.EmbedModel.EmbedContent(ctx, genai.Text(text))
 	if err != nil {
 		log.Fatal(err)

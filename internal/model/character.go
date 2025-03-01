@@ -126,11 +126,11 @@ func JSONToString(data interface{}) string {
 	return string(jsonData)
 }
 
-func (o Operator) OperatorToStrings() ([][]string, []map[string]*qdrant.Value) {
+func (o Operator) Values() ([][]string, []map[string]*qdrant.Value) {
 
 	retStr := [][]string{}
 	retVal := []map[string]*qdrant.Value{}
-	metadata := fmt.Sprintf(`%s`, o.OperatorName)
+	metadata := o.OperatorName
 
 	base := fmt.Sprintf(`
 		ShortDescription: %s
@@ -332,5 +332,6 @@ func (o Operator) OperatorToStrings() ([][]string, []map[string]*qdrant.Value) {
 		}
 	}
 
+	print("Length: ", len(retStr), "-", len(retVal), "\n")
 	return retStr, retVal
 }

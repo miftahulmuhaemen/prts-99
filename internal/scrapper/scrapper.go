@@ -65,8 +65,12 @@ func updateOrCreateAttribute(attributes map[string]model.Attribute, key string, 
 	}
 }
 
-func Scrapper(maxVisits int32, link string, c *colly.Collector) ([]model.Operator, error) {
+func Scrapper(maxVisits int32, link string) ([]model.Operator, error) {
 	operators := make([]model.Operator, 0, 10)
+	collector := colly.NewCollector(
+		colly.AllowedDomains("arknights.wiki.gg"),
+		colly.CacheDir("./cache"),
+	)
 	var wg sync.WaitGroup
 	var visitedCount int32 = 0
 
@@ -75,10 +79,10 @@ func Scrapper(maxVisits int32, link string, c *colly.Collector) ([]model.Operato
 		defer wg.Done()
 
 		// Clone another collector to scrape operators
-		operatorCollector := c.Clone()
+		operatorCollector := collector.Clone()
 
 		// On every a element which has href attribute call callback
-		c.OnHTML("table.mrfz-wtable td[align='center'] > a[href^='/wiki/']", func(e *colly.HTMLElement) {
+		collector.OnHTML("table.mrfz-wtable td[align='center'] > a[href^='/wiki/']", func(e *colly.HTMLElement) {
 
 			link := e.Attr("href")
 
@@ -94,7 +98,7 @@ func Scrapper(maxVisits int32, link string, c *colly.Collector) ([]model.Operato
 
 		})
 
-		c.OnRequest(func(r *colly.Request) {
+		collector.OnRequest(func(r *colly.Request) {
 			fmt.Println("Visiting", r.URL.String())
 		})
 
@@ -440,7 +444,7 @@ func Scrapper(maxVisits int32, link string, c *colly.Collector) ([]model.Operato
 
 		})
 
-		c.Visit(link)
+		collector.Visit(link)
 	}()
 
 	wg.Wait()
